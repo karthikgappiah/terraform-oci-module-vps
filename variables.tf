@@ -1,45 +1,52 @@
-# FILENAME: Variables File
-# FILEPATH: variables.tf
+# FILENAME: Server Module Variables File
+# FILEPATH: src/modules/server/variables.tf
 
 variable "compartment_id" {
-  description = "OCID of the compartment to create instances in."
+  description = "OCID of the compartment the instances are created in."
   type        = string
 }
 
 variable "tenancy_ocid" {
-  description = "OCID of the tenancy, used to look up availability and fault domains."
+  description = "OCID of the OCI tenancy, used for image and domain data sources."
   type        = string
 }
 
 variable "prefix" {
   description = "Prefix applied to resource names."
   type        = string
-  default     = "my"
-
-  validation {
-    condition     = can(regex("^[a-z][a-z0-9]*$", var.prefix)) && length(var.prefix) <= 9
-    error_message = "prefix must be lowercase alphanumeric, start with a letter, and be at most 9 characters."
-  }
 }
 
-variable "public_subnet_id" {
-  description = "OCID of the public subnet to attach instances to."
+variable "subnet_id" {
+  description = "OCID of the subnet the instance VNICs attach to."
   type        = string
 }
 
+variable "ad_number" {
+  description = "Availability domain number (1-based) to place the instances in."
+  type        = number
+}
+
 variable "opc_keys" {
-  description = "SSH public keys authorized for the opc user on all instances."
+  description = "SSH public keys authorized for the opc user on the instances."
   type        = list(string)
 }
 
 variable "macro_count" {
-  description = "Number of A1.Flex (Arm) instances. Total OCPUs across all instances must stay within the 4 OCPU / 24 GB always-free Arm pool."
+  description = "Number of A1.Flex Arm instances to provision."
   type        = number
-  default     = 2
+}
+
+variable "macro_ocpus" {
+  description = "OCPUs per A1.Flex instance."
+  type        = number
+}
+
+variable "macro_ram_in_gbs" {
+  description = "Memory in GB per A1.Flex instance."
+  type        = number
 }
 
 variable "micro_count" {
-  description = "Number of E2.1.Micro (x86) instances. OCI grants 2 micros in the always-free tier."
+  description = "Number of E2.1.Micro x86 instances to provision."
   type        = number
-  default     = 2
 }
