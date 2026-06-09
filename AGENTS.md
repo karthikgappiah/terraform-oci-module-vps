@@ -1,54 +1,32 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents (Claude Code, Copilot, Cursor, etc.) when working with code in this repository.
+Guidance for AI coding agents (Claude Code, Copilot, Cursor) working in this repo.
 
-## Overview
+## What this is
 
-This is a **Terraform module** for provisioning OCI (Oracle Cloud Infrastructure) Always Free compute instances (VPS). It is designed to be consumed as a child module by a root Terraform configuration — it does not contain a root module itself.
+A **child Terraform module** that provisions OCI Always Free compute (VPS). No root module — it is meant to be called by a root config.
 
-## Common Commands
+## Commands
 
 ```bash
-# Validate syntax and configuration
-terraform validate
-
-# Format all files
-terraform fmt -recursive
-
-# Plan (from a root module that calls this one)
-terraform plan
-
-# Apply
-terraform apply
+terraform fmt -recursive   # format
+terraform validate         # validate
+terraform plan / apply     # run from a root module that calls this one
 ```
 
-## Module Architecture
+## Architecture
 
-The module provisions two instance types within a single OCI availability domain:
+Provisions two instance types in a single availability domain, each spread across fault domains via `count.index % fd_count`:
 
-- **Macro** ([macro.tf](macro.tf)): `VM.Standard.A1.Flex` Arm instances (Oracle Linux 10). Supports configurable OCPU/RAM. Spread across fault domains via `count.index % fd_count`.
-- **Micro** ([micro.tf](micro.tf)): `VM.Standard.E2.1.Micro` x86 instances (Oracle Linux 10). Fixed shape, no configurable sizing.
+- **Macro** ([macro.tf](macro.tf)) — `VM.Standard.A1.Flex` Arm, Oracle Linux 10, configurable OCPU/RAM. Gets [scripts/server-init.sh](scripts/server-init.sh) via `user_data` (base64).
+- **Micro** ([micro.tf](micro.tf)) — `VM.Standard.E2.1.Micro` x86, Oracle Linux 10, fixed shape. No startup script.
 
-Key design decisions:
-- **Always Free guard-rails**: `lifecycle.precondition` blocks in both `macro.tf` and `micro.tf` enforce OCI Always Free limits (4 Arm OCPUs, 24 GB RAM, 2 Micro instances, 200 GB total block storage) at plan time.
-- **Boot volume size**: Both instance types use 50 GB boot volumes, tracked via locals in [main.tf](main.tf) for the shared storage cap check.
-- **Startup script**: Macro instances receive [scripts/server-init.sh](scripts/server-init.sh) via `user_data` (base64-encoded). Micro instances do not.
-- **Image selection**: Both types query for the latest Oracle Linux 10 image at plan time via `oci_core_images` data sources filtered by shape.
+Conventions:
+- **Always Free guard-rails** — `lifecycle.precondition` blocks enforce limits at plan time: 4 Arm OCPUs, 24 GB Arm RAM, 2 Micro instances, 200 GB total boot storage. Limits live as `local.free_*` in [main.tf](main.tf).
+- **Boot volumes** — 50 GB each (`local.*_boot_gbs`), summed into `local.total_boot_gbs` for the storage cap.
+- **Images** — latest Oracle Linux 10 resolved at plan time via `oci_core_images`, filtered by shape.
+- **Versions** — Terraform `~> 1.15.0`, `oracle/oci` `~> 8.17.0` (see [versions.tf](versions.tf)).
 
-## Required Inputs
+## Inputs / Outputs
 
-| Variable | Description |
-|---|---|
-| `compartment_id` | OCID of the target compartment |
-| `tenancy_ocid` | Tenancy OCID (used for image/domain data sources) |
-| `prefix` | Name prefix for all resources |
-| `subnet_id` | Subnet OCID for instance VNICs |
-| `ad_number` | Availability domain number (1-based) |
-| `opc_keys` | List of SSH public keys for the `opc` user |
-| `macro_count` / `macro_ocpus` / `macro_ram_in_gbs` | A1.Flex sizing |
-| `micro_count` | Number of E2.1.Micro instances |
-
-## Provider & Version Constraints
-
-- Terraform: `~> 1.15.0`
-- OCI provider (`oracle/oci`): `~> 8.17.0`
+Canonical definitions live in [variables.tf](variables.tf) and [outputs.tf](outputs.tf); keep the README table in sync when they change. Required inputs: `compartment_id`, `tenancy_ocid`, `prefix`, `subnet_id`, `ad_number`, `opc_keys`, `macro_count`/`macro_ocpus`/`macro_ram_in_gbs`, `micro_count`.
